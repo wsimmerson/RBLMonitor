@@ -1,12 +1,14 @@
 #!/usr/bin/python3
 #####################################
 #                                   #
-#   Real-Time Black List Monitor    #
+#   Real-Time Black List Monitor    #   
+#                                   #
 #   By: Wayne Simmerson             #
+#   https://github.com/wsimmerson   #
 #                                   #
 #####################################
 
-from sqlalchemy import create_engine, or_
+from sqlalchemy import create_engine, or_, and_
 from sqlalchemy.orm import sessionmaker
 from ipaddress import IPv4Address, AddressValueError
 from socket import gethostbyname
@@ -144,21 +146,84 @@ class RBLMonitor:
             self.check_ip2rbl, update Listings accordingly and
             return report data
         """
-        return "report data"
+        blacklists = self.session.query(Blacklist).all()
+        servers = self.session.query(Server).all()
+        listings = self.session.query(Listing).all()
 
-    def send_report(report_data, email):
+        data = {}
+        changed = False
+
+        add = "[+] "
+        rem = "[-] "
+
+        for listing in listings:
+            # setup data from current listings
+            bl = self.session.query(Blacklist).get(str(listing.blacklist_id))
+            sv = self.session.query(Server).get(str(listing.server_id))
+
+            if sv.name not in data:
+                data[sv.name] = [add + bl.name]
+            else:
+                data[sv.name].append(add + bl.name)
+
+
+        for server in servers:
+            # Perform Checks, update data dict and listings table
+            if server.name not in data:
+                data[server.name] = []
+
+            for blacklist in blacklists:
+                if self.check_ip2rbl(server.ip_address, blacklist.url):
+                    # If the ip is blacklisted
+                    if not (add + blacklist.name) in data[server.name]:
+                        # If its not alreay added to data
+                        data[server.name].append(add + blacklist.name)
+                        new = Listing(blacklist_id = blacklist.id, server_id = server.id)
+                        self.session.add(new)
+                        self.session.commit()
+                        changed = True
+                else:
+                    if (add + blacklist.name) in data[server.name]:
+                        # update the data, and remove listing from base
+                        data[server.name].remove(add + blacklist.name)
+                        data[server.name].append(rem + blacklist.name)
+                        rm = self.session.query(Listing).filter(and_(Listing.blacklist_id == blacklist.id, 
+                            Listing.server_id == server.id)).first()
+                        self.session.delete(rm)
+                        self.session.commit()
+                        changed = True
+
+        # Build report from data
+        report = "\n\n######################################\n\nRBL Status Summary\n\n"
+
+        for server in data:
+            report += "\n\n%s\n" % server
+            if len(data[server]) == 0:
+                report += "No Blacklist Entries found\n"
+            else:
+                for entry in data[server]:
+                    report += entry + "\n"
+        
+
+        return {"status_changed": changed, "report_data": report}
+
+    def send_report(self, report_data, email):
         """
             Email status report
         """
         msg = MIMEText(report_data)
         msg['Subject'] = 'RBL Check Report'
-        msg['From'] = 'mail_admin@localhost'
+        msg['From'] = 'root@localhost'
         msg['To'] = email
 
         # Send the message via our own SMTP server.
-        s = smtplib.SMTP('localhost')
-        s.send_message(msg)
-        s.quit()
+        try:
+            host = 'localhost'
+            s = smtplib.SMTP(host)
+            s.send_message(msg)
+            s.quit()
+        except ConnectionRefusedError:
+            print("Connection to MTA %s Refused!" % host)
     
 if __name__ == '__main__':
     # Create RBLMonitor
@@ -206,7 +271,9 @@ if __name__ == '__main__':
         rbl.checkip2rbl(options['lookup'][0], options['lookup'][1])
 
     elif not not options['email']:
-        rbl.send_report(check_all(), options['email'])
+        report = rbl.check_all()
+        if report['status_changed']:
+            rbl.send_report(report['report_data'], options['email'])
 
     elif options['show_rbls']:
         rbl.print_rbls()
@@ -215,5 +282,6 @@ if __name__ == '__main__':
         rbl.print_servers()
 
     else:
-        print(rbl.check_all())
+        data = rbl.check_all()
+        print(data['status_changed'], data['report_data'])
 

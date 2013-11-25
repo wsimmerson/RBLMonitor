@@ -1,9 +1,13 @@
 #!/usr/bin/python3
-###########################
-#
-#   Set up Database
-#
-###########################
+#####################################
+#                                   # 
+#   Real-Time Black List Monitor    #   
+#   Database Setup & objects        #
+#                                   #
+#   By: Wayne Simmerson             #
+#   https://github.com/wsimmerson   #
+#                                   #
+#####################################
 
 from sqlalchemy import create_engine, ForeignKey
 from sqlalchemy import Column, Date, Integer, String
