@@ -1,4 +1,4 @@
-RBL Monitor
+RBL Monitor - work in progress!
 
 Checks user supplied servers against a list of user supplied RBLs (Real-Time Black Lists)
 The intended use of this script is to periodically verify you e-mail server is not currently
