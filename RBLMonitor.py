@@ -11,6 +11,8 @@ from sqlalchemy.orm import sessionmaker
 from ipaddress import IPv4Address, AddressValueError
 from socket import gethostbyname
 import argparse
+import smtplib
+from email.mime.text import MIMEText
 
 from RBLMonitor_db import Blacklist, Server, Listing
 
@@ -148,6 +150,15 @@ class RBLMonitor:
         """
             Email status report
         """
+        msg = MIMEText(report_data)
+        msg['Subject'] = 'RBL Check Report'
+        msg['From'] = 'mail_admin@localhost'
+        msg['To'] = email
+
+        # Send the message via our own SMTP server.
+        s = smtplib.SMTP('localhost')
+        s.send_message(msg)
+        s.quit()
     
 if __name__ == '__main__':
     # Create RBLMonitor
