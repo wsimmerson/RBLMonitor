@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 #####################################
-#                                   # 
-#   Real-Time Black List Monitor    #   
+#                                   #
+#   Real-Time Black List Monitor    #
 #   Database Setup & objects        #
 #                                   #
 #   By: Wayne Simmerson             #
@@ -10,12 +10,14 @@
 #####################################
 
 from sqlalchemy import create_engine, ForeignKey
-from sqlalchemy import Column, Date, Integer, String
+from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, backref
+from datetime import datetime
 
 engine = create_engine('sqlite:///RBLMonitor.db', echo=True)
 Base = declarative_base()
+
 
 #############################
 class Blacklist(Base):
@@ -33,6 +35,7 @@ class Blacklist(Base):
         self.name = name
         self.url = url
 
+
 ############################
 class Server(Base):
     """
@@ -49,6 +52,7 @@ class Server(Base):
         self.name = name
         self.ip_address = ip_address
 
+
 ############################
 class Listing(Base):
     """
@@ -60,6 +64,7 @@ class Listing(Base):
     id = Column(Integer, primary_key=True)
     blacklist_id = Column(Integer, ForeignKey('blacklists.id'))
     server_id = Column(Integer, ForeignKey('servers.id'))
+    logged = Column(DateTime, default=datetime.utcnow)
 
     def __init__(self, blacklist_id, server_id):
         self.blacklist_id = blacklist_id
@@ -70,3 +75,29 @@ class Listing(Base):
 
 if __name__ == '__main__':
     Base.metadata.create_all(engine)
+
+    engine = create_engine('sqlite:///RBLMonitor.db', echo=False)
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    RBLS = {'Spamhaus-Zen': 'zen.spamhaus.org',
+            'Spamcop': 'bl.spamcop.net',
+            'Sorbs': 'dnsbl.sorbs.net',
+            'Barracuda': 'b.barracudacentral.org',
+            'Mailspike-Blacklist': 'bl.mailspike.net',
+            'Mailspike-Reputation': 'rep.mailspike.net',
+            'McAfee': 'cidr.bl.mcafee.com',
+            'Microsoft Forefront': 'dnsbl.forefront.microsoft.com',
+            'nsZones': 'bl.nszones.com',
+            'ORBIT': 'rbl.orbit.com',
+            'Pedantic-Netblock': 'netblock.pedantic.org',
+            'Pedantic-Spam': 'spam.pedantic.org',
+            'Lashback': 'ubl.unsubscore.com',
+            'Backscatterer': 'ips.backscatterer.org'
+            }
+
+    # populate rbls from above
+
+    for name, rbl in RBLS.items():
+        session.add(Blacklist(name, rbl))
+    session.commit()
