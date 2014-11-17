@@ -144,7 +144,7 @@ class RBLMonitor:
         ip_rev = '.'.join(ip_parts)
 
         try:
-            lookup = gethostbyname(ip_rev + '.' + rbl_url)
+            gethostbyname(ip_rev + '.' + rbl_url)
             return True
         except:
             return False
